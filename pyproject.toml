@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wavelab-ai"
+version = "0.3.0"
+description = "Local PSCAD ingestion and deterministic academic waveform figures"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26,<3", "pydantic>=2,<3", "matplotlib>=3.9,<4", "streamlit>=1.65,<2"]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.26,<2"]
+test = ["pytest>=8,<10", "pypdf>=5,<7"]
+
+[project.scripts]
+wavelab-inspect = "wavelab.cli:main"
+wavelab-render = "wavelab.render.cli:main"
+wavelab-mcp = "wavelab.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+
+[tool.setuptools.package-data]
+wavelab = ["inset_canvas/*.html", "panel_order_canvas/*.html"]

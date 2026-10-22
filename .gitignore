@@ -1,0 +1,50 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+.env
+.streamlit/secrets.toml
+# Private research data: require explicit permission before public release.
+*.txt
+*.csv
+!examples/stage03c1_demo/synthetic_arms.csv
+*.npy
+*.npz
+!requirements.txt
+reports/
+.wavelab/
+
+# Local research, course delivery copies and machine-specific configuration.
+/.codex/
+/test/fixtures/
+/deliverables/
+/submission_draft/
+/poster_redesign_20261020/
+/.poster_build/
+/.poster_portrait_build/
+/tmp/
+/docs/maintenance/
+*.zip
+*.log
+*.pdf
+*.pptx
+*.docx
+
+# Generated chart snapshots; keep build source and validation records visible.
+/.chart-data-*/
+/.poster_build/node_modules/
+/.poster_portrait_build/node_modules/
+/.poster_build/*.proto.json
+/.poster_portrait_build/*.proto.json
+/.poster_build/candidate.pptx
+/.poster_portrait_build/candidate.pptx
+/.poster_build/candidate.pptx.inspect.ndjson
+/.poster_portrait_build/candidate.pptx.inspect.ndjson
+/.poster_portrait_build/*.aux
+/.poster_portrait_build/*.out
+/.poster_portrait_build/报告.log
+/tmp/pdfs/review/*.png
+# Public synthetic input in the unchanged course delivery copy.
+!/deliverables/course_2026/current/项目/examples/synthetic_six_arms.csv
+!/deliverables/course_2026/current/项目/examples/已验证输出/Synthetic_six_arms/data/*.txt
+

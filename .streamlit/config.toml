@@ -1,0 +1,18 @@
+[server]
+address = "127.0.0.1"
+headless = true
+fileWatcherType = "none"
+
+[browser]
+gatherUsageStats = false
+
+# Workbench is a mutable session-owned service. Wait for the current script's
+# yield point instead of launching a replacement while a transaction renders.
+[runner]
+fastReruns = false
+
+[theme]
+primaryColor = "#167C80"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F2F6F7"
+textColor = "#203039"

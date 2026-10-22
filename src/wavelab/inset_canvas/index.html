@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;font:14px sans-serif}button{margin:3px;padding:6px;cursor:pointer}#view{position:relative;touch-action:none}img{width:100%;display:block;pointer-events:none}.box{position:absolute;border:2px dashed #d55e00;box-sizing:border-box;pointer-events:none}#hint{color:#555;font-size:12px}
+</style></head><body><button id="select">框选局部放大区域</button><span id="hint">点击按钮后在主图拖动；拖动已有局部图可移动位置。</span><div id="view"><img id="image" alt="交互科研波形画布"><div id="box" class="box" hidden></div></div><script>
+let args, selecting=false, drag=null;
+const view=document.getElementById('view'), img=document.getElementById('image'), box=document.getElementById('box');
+const send=(type,extra={})=>parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
+const height=()=>send('streamlit:setFrameHeight',{height:document.body.scrollHeight+5});
+img.onload=height;new ResizeObserver(height).observe(view);
+document.getElementById('select').onclick=()=>{selecting=!selecting;document.getElementById('hint').textContent=selecting?'在主图框选；松开后到下方确认创建。':'拖动已有局部图可移动位置。';};
+window.addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;img.src='data:image/png;base64,'+args.image;box.hidden=true;drag=null;});
+const point=e=>{const r=view.getBoundingClientRect();return [(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];};
+const inside=(x,y,r)=>x>=r[0]&&x<=r[0]+r[2]&&y>=r[1]&&y<=r[1]+r[3];
+const show=r=>{box.hidden=false;box.style.left=r[0]*100+'%';box.style.top=r[1]*100+'%';box.style.width=r[2]*100+'%';box.style.height=r[3]*100+'%';};
+view.onpointerdown=e=>{if(!args)return;let [x,y]=point(e);for(const p of args.panels){if(!inside(x,y,p.rect))continue;const [px,py,pw,ph]=p.rect;if(selecting){drag={kind:'select',p,start:[x,y]};}else{for(const i of [...p.insets].reverse()){const b=i.bounds,r=[px+b[0]*pw,py+(1-b[1]-b[3])*ph,b[2]*pw,b[3]*ph];if(inside(x,y,r)){drag={kind:'move',p,i,start:[x,y],r};break;}}}if(drag){view.setPointerCapture(e.pointerId);e.preventDefault();}break;}};
+view.onpointermove=e=>{if(!drag)return;let [x,y]=point(e);const d=drag,[px,py,pw,ph]=d.p.rect; x=Math.max(px,Math.min(px+pw,x));y=Math.max(py,Math.min(py+ph,y));if(d.kind==='select'){d.end=[x,y];show([Math.min(x,d.start[0]),Math.min(y,d.start[1]),Math.abs(x-d.start[0]),Math.abs(y-d.start[1])]);}else{const r=d.r;d.next=[Math.max(px,Math.min(px+pw-r[2],r[0]+x-d.start[0])),Math.max(py,Math.min(py+ph-r[3],r[1]+y-d.start[1])),r[2],r[3]];show(d.next);}};
+view.onpointerup=e=>{if(!drag)return;view.onpointermove(e);const d=drag;drag=null;const [px,py,pw,ph]=d.p.rect;let value={revision:args.revision,panel_id:d.p.id,nonce:Date.now()};if(d.kind==='select'&&d.end){const x=[d.start[0],d.end[0]].sort((a,b)=>a-b),y=[d.start[1],d.end[1]].sort((a,b)=>a-b);if(x[1]-x[0]<.003||y[1]-y[0]<.003)return;const toX=v=>d.p.xlim[0]+(v-px)/pw*(d.p.xlim[1]-d.p.xlim[0]),toY=v=>d.p.ylim[1]-(v-py)/ph*(d.p.ylim[1]-d.p.ylim[0]);Object.assign(value,{kind:'select',xlim:x.map(toX),ylim:[toY(y[1]),toY(y[0])]});selecting=false;}else if(d.kind==='move'&&d.next){const r=d.next;Object.assign(value,{kind:'move',inset_id:d.i.id,bounds:[(r[0]-px)/pw,1-(r[1]-py+r[3])/ph,d.i.bounds[2],d.i.bounds[3]]});value.bounds[0]=Math.max(0,Math.min(1-value.bounds[2],value.bounds[0]));value.bounds[1]=Math.max(0,Math.min(1-value.bounds[3],value.bounds[1]));}else{return;}send('streamlit:setComponentValue',{value,dataType:'json'});};
+view.onpointercancel=()=>{drag=null;box.hidden=true;};send('streamlit:componentReady',{apiVersion:1});height();
+</script></body></html>

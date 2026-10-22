@@ -1,0 +1,16 @@
+<!doctype html><html><meta charset="utf-8"><style>
+body{margin:0;font:14px sans-serif;color:#333} .card{border:1px solid #aaa;border-radius:5px;padding:9px;margin:5px 0;background:#f8f9fb;cursor:grab} .over{border:2px solid #367bd5} .hint{font-size:12px;color:#666}
+</style><div class="hint">拖动卡片到目标卡片的位置，松开后提交。</div><div id="cards"></div><script>
+let args, source;
+function send(type, more={}){window.parent.postMessage({isStreamlitMessage:true,type,...more},"*")}
+window.addEventListener("message", e=>{
+ if(e.data.type!=="streamlit:render")return;
+ args=e.data.args;const root=document.getElementById("cards");root.replaceChildren();
+ args.panels.forEach((p,i)=>{const row=document.createElement("div");row.className="card";row.draggable=true;row.textContent=`☰ ${i+1}. ${p.id}${p.title ? ' · '+p.title : ''}`;
+ row.ondragstart=e=>{source=p.id;e.dataTransfer.setData("text/plain",p.id);e.dataTransfer.effectAllowed="move"};
+ row.ondragover=e=>{e.preventDefault();row.classList.add("over")};row.ondragleave=()=>row.classList.remove("over");
+ row.ondrop=e=>{e.preventDefault();row.classList.remove("over");if(!source||source===p.id)return;const ids=args.panels.map(p=>p.id);ids.splice(ids.indexOf(source),1);ids.splice(i,0,source);send("streamlit:setComponentValue",{value:{panel_ids:ids,revision:args.revision,binding:args.binding},dataType:"json"});source=null};
+ row.ondragend=()=>{source=null;document.querySelectorAll('.over').forEach(el=>el.classList.remove('over'))};root.appendChild(row)});
+ send("streamlit:setFrameHeight",{height:35+args.panels.length*47});
+});send("streamlit:componentReady",{apiVersion:1});
+</script></html>

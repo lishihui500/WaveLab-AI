@@ -1,0 +1,15 @@
+{
+  "purpose": "相同数据、目标图和质量标准下比较手动 GUI 与真实 AI 助手，可选通用编程助手。当前没有实测效率结论。",
+  "methods": ["manual_gui", "runtime_llm", "general_coding_assistant"],
+  "tasks": [
+    {"id":"T1", "request":"六个确认桥臂通道分为三子图，上蓝实线、下橙虚线，IEEE 英文双栏"},
+    {"id":"T2", "request":"只调整横轴为 1.4–1.6 秒"},
+    {"id":"T3", "request":"保持英文坐标轴，图例改为中文"},
+    {"id":"T4", "request":"只修改 B 相下桥臂颜色和线型，再撤销"},
+    {"id":"T5", "request":"四电流、1.2 秒故障标记、相对 ms 时间、图外图例"},
+    {"id":"T6", "request":"六电压单图、图外三列图例、保存重开"}
+  ],
+  "record_fields": ["task_id", "method", "repeat", "elapsed_s", "human_actions", "success", "unrequested_changes", "interventions", "academic_quality_pass", "model_calls", "tokens", "cost", "evidence_path"],
+  "records": [],
+  "protocol": "预先确认单位与映射；每个方法从相同 FigureSpec 起点运行；从首个人工操作开始，到独立核查通过结束计时，包含修改和干预；保留失败试验；顺序交替并分别记录首次/熟练操作；核查通道、数值、时间轴、尺寸、图例和未指定字段。不得把 Mock 执行时间当作真实 AI 时间。"
+}
