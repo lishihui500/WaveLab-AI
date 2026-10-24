@@ -1,10 +1,12 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "wavelab-ai"
 version = "0.3.0"
+license = "MIT"
+license-files = ["LICENSE"]
 description = "Local PSCAD ingestion and deterministic academic waveform figures"
 requires-python = ">=3.11"
 dependencies = ["numpy>=1.26,<3", "pydantic>=2,<3", "matplotlib>=3.9,<4", "streamlit>=1.65,<2"]
