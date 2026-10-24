@@ -1,73 +1,95 @@
 # WaveLab AI
 
-本地科研波形绘图工作台。导入仿真软件/示波器/录波仪的波形数据（如PSCAD 图窗导出的 TXT/CSV），用统一绘图配置完成手动编辑、Codex MCP 操作和 Matplotlib 科研图导出。
+**用自然语言和可视化编辑，把波形数据整理成科研图。**
 
-## 功能
+WaveLab AI 是面向电气工程、电力电子及其他时序数据分析场景的本地绘图工作台。导入仿真软件、示波器或录波仪导出的 TXT/CSV 数据，选择通道、组织子图、调整样式，即可导出论文和报告所需的 PDF、SVG、PNG。也可以连接 Codex，用自然语言完成绘图修改。
 
-- 保留原始采样、重复表头和通道列序，以数据集 ID + 原始列索引识别通道。
-- 多子图、曲线样式、图例、事件标记、绝对/相对时间轴及局部放大图。
-- 中英文图形标签、单位显示换算、PDF/PNG/SVG 导出。
-- 本地工程保存与重开、撤销与恢复；不配置模型 API Key 也可使用。
-- Codex 显式编辑目标、白名单原子操作、版本校验、采样窗口预检和协议一致性检查。
-- 另提供 ChatGPT 手动 JSON 协作与可选 OpenAI 兼容 API；API 仅在用户确认并点击生成时调用。
+[快速开始](#快速开始) · [绘图教程](docs/getting_started.md) · [Codex 接入](docs/codex_mcp.md) · [示例数据](examples/stage03c1_demo/README.md)
 
-## 安装与启动
+## 主要功能
 
-需要 Python 3.11 或更高版本；本机测试环境为 Windows + Python 3.14，其他环境尚未完整验收。
+- **数据导入**：上传 TXT/CSV、粘贴表格文本，支持多通道和重复列名。
+- **交互绘图**：多子图、曲线分组与排序、图例、坐标范围、事件标记、局部放大图。
+- **科研排版**：单栏/双栏尺寸、中英文标签、物理量与单位设置、矢量图导出。
+- **自然语言编辑**：通过 Codex MCP 或 ChatGPT 协作，描述需要修改的图形内容。
+- **工程复用**：保存数据和绘图设置，重新打开继续编辑，支持撤销与恢复。
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[mcp,test]"
-.\start_workbench.ps1
+## 快速开始
+
+准备 **Python 3.11+** 和浏览器。手动绘图可直接使用，AI 功能按需配置。
+
+### 下载
+
+点击 **[下载 ZIP](https://github.com/lishihui500/WaveLab-AI/archive/refs/heads/main.zip)** 并解压，或使用 Git：
+
+```bash
+git clone https://github.com/lishihui500/WaveLab-AI.git
+cd WaveLab-AI
 ```
 
-打开 <http://127.0.0.1:8501>。也可直接运行：
+在包含 `app.py` 的项目目录打开终端，执行对应系统的命令。首次安装需要联网下载依赖。
+
+### Windows（PowerShell）
 
 ```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e .
 .\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
-代码更新后请保存工程、重启现有服务，再重新打开工程。默认不启用文件热重载。
+如果使用 `python` 命令启动 Python，将第一行改为 `python -m venv .venv`。
 
-## 使用
+### macOS / Linux
 
-1. 从左侧导入或粘贴数据，或打开已保存工程。
-2. 选择通道、确认实际单位与物理映射，再设置子图和样式。
-3. 在上方“AI 科研绘图助手”点击“设为 Codex 编辑目标”，随后在 Codex 中输入绘图要求。
-4. 修改通过原子事务提交并回读；需要保存时明确提出，或使用 GUI 保存按钮。
-5. 在画布下方导出论文图。迁移工程时复制整个工程目录及其 data 子目录。
-
-MCP stdio 启动命令：
-
-```powershell
-.\.venv\Scripts\python.exe -m wavelab.mcp_server
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
-在 Codex 的 MCP 配置中使用上述解释器的实际绝对路径，参数为 `-m wavelab.mcp_server`。完整流程、错误处理及保存边界见 [Codex MCP 指南](docs/codex_mcp.md)。
+浏览器打开 **[http://127.0.0.1:8501](http://127.0.0.1:8501)**。以后启动时执行最后一行即可；使用期间保持终端运行，结束时按 `Ctrl+C`。
 
-## 公开示例与测试
+## 画出第一张图
 
-[合成六桥臂示例](examples/stage03c1_demo/README.md)可用于公开演示。公开仓库不包含真实科研仿真数据、个人绘图工程、密钥、运行日志或历史课程交付副本。
+1. 在左侧“导入 TXT / CSV”上传 [`synthetic_arms.csv`](examples/stage03c1_demo/synthetic_arms.csv)，点击“导入上传文件”。
+2. 选择目标子图，勾选要绘制的通道并应用。
+3. 在右侧调整颜色、线型、图例和坐标范围；通过“添加子图”组织多幅波形。
+4. 在“导出论文图”选择 PDF、SVG 或 PNG，点击“导出当前视图”，下载图形文件。
+5. 填写工程名称，点击“保存工程”，下次从“已保存工程”继续编辑。
 
-可独立运行的快速回归：
+[跟着六桥臂示例完成三幅子图 →](examples/stage03c1_demo/README.md)
 
-```powershell
-.\.venv\Scripts\python.exe -m pytest tests/test_parser.py tests/test_figure_spec.py tests/test_ai.py tests/test_manual.py tests/test_manual_dialogue.py tests/test_local_bridge.py tests/test_mcp_workflow.py tests/test_mcp_insets.py -q
-```
+## 用自然语言修改图形
 
-完整历史测试包含依赖私有 `test/fixtures/` 和本地 `reports/` 的验收项，公开仓库未附带这些输入，直接运行全部测试会遇到缺失文件。不要用合成数据冒充真实验收样本。部分 scripts/ 工具同样依赖本地历史资料，使用前查看其输入要求。
+连接 Codex 后，打开工程，点击“设为 Codex 编辑目标”，即可提出绘图要求：
 
-## 代码结构
+> 将六条曲线按 A、B、C 三组排成三幅子图，每组两条曲线。
+>
+> 把第一幅子图的第二条曲线改为红色虚线，图例放在顶部。
+>
+> 在 1.49–1.51 s 添加局部放大图，放在右上角。
 
-| 目录/文件 | 用途 |
+[配置 Codex MCP →](docs/codex_mcp.md)
+
+也可使用 [ChatGPT 手动协作](docs/manual_dialogue_workflow.md)，或在工作台的“其他方式：ChatGPT / API”中配置模型服务。
+
+## 文档导航
+
+| 想做什么 | 阅读文档 |
 |---|---|
-| `app.py` | Streamlit 工作台入口 |
-| `src/wavelab/` | 数据模型、解析、绘图、工程服务、Action Executor 与 MCP |
-| `tests/` | 单元、事务和 GUI 回归测试 |
-| `examples/` | 可公开的合成案例 |
-| `scripts/` | 验证与性能测量工具 |
-| `docs/` | 功能与协议说明；带阶段编号的文档是历史设计记录 |
+| 导入自己的数据，设置单位、事件与局部图 | [绘图与使用指南](docs/getting_started.md) |
+| 使用示例数据练习 | [六桥臂绘图教程](examples/stage03c1_demo/README.md) |
+| 让 Codex 直接修改图形 | [Codex MCP 接入](docs/codex_mcp.md) |
+| 在 ChatGPT 中讨论并应用绘图方案 | [ChatGPT 协作](docs/manual_dialogue_workflow.md) |
+| 换电脑、更新软件或排查启动问题 | [工程管理与常见问题](docs/getting_started.md#工程管理) |
+| 运行测试、了解代码和协议 | [开发指南](docs/development.md) |
 
-默认工作数据保存在 `.wavelab/`，不纳入 Git。`.streamlit/secrets.example.toml` 为可选 API 配置模板；实际 secrets.toml 不得提交。AI 仅修改受校验绘图配置，不执行任意生成代码，也不隐式平滑、插值或重采样。
+## 项目与许可
 
-更多说明：[物理量与单位](docs/quantity_presets.md) · [手动协作](docs/manual_dialogue_workflow.md) · [绘图架构](docs/architecture.md)。
+WaveLab AI 是 AI 辅助科研绘图课程项目，由作者提出需求、设计绘图流程并核对结果，Codex 辅助软件实现与测试。工作台采用 Python、Streamlit 和 Matplotlib 构建。
+
+代码、技术文档与公开示例采用 [MIT 许可证](LICENSE)。示例数据由正弦公式生成，可用于教学、演示和绘图练习。真实科研数据、个人工程及单独提供的海报、报告按各自授权使用。
+
+欢迎通过 [Issues](https://github.com/lishihui500/WaveLab-AI/issues) 反馈问题或提出建议。请附操作系统、Python 版本、复现步骤和报错信息。
