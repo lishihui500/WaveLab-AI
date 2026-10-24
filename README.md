@@ -1,6 +1,6 @@
 # WaveLab AI
 
-本地科研波形绘图工作台。导入 PSCAD 图窗导出的 TXT/CSV，用统一绘图配置完成手动编辑、Codex MCP 操作和 Matplotlib 科研图导出。
+本地科研波形绘图工作台。导入仿真软件/示波器/录波仪的波形数据（如PSCAD 图窗导出的 TXT/CSV），用统一绘图配置完成手动编辑、Codex MCP 操作和 Matplotlib 科研图导出。
 
 ## 功能
 
