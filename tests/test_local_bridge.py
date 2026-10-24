@@ -155,10 +155,12 @@ def test_stage_b_actions_and_save_reopen(work, tmp_path):
         np.testing.assert_array_equal(fresh.data[key].samples, samples)
 
 
-def test_gui_remote_sort_then_one_click_undo(tmp_path):
+def test_gui_remote_sort_then_one_click_undo(tmp_path, monkeypatch):
     from streamlit.testing.v1 import AppTest
     from pathlib import Path
-    from wavelab.local_bridge import get_bridge
+    import wavelab.local_bridge as module
+    bridge = Bridge(tmp_path / "runtime")
+    monkeypatch.setattr(module, "get_bridge", lambda directory: bridge)
     root = Path(__file__).resolve().parents[1]
     at = AppTest.from_file(root / "app.py", default_timeout=30)
     at.session_state["workbench"] = Workbench(tmp_path)
@@ -170,7 +172,6 @@ def test_gui_remote_sort_then_one_click_undo(tmp_path):
     w.create_panel("third")
     at.run()
     before = w.spec
-    bridge = get_bridge(root / ".wavelab" / "runtime")
     sid = at.session_state["mcp_session_id"]
     with ThreadPoolExecutor(1) as pool:
         pending = pool.submit(bridge.request, "apply_plot_actions", request(w), sid)
@@ -185,6 +186,7 @@ def test_gui_remote_sort_then_one_click_undo(tmp_path):
     assert not at.exception
     assert w.spec == before
     assert len(w.spec.datasets) == 1
+    bridge.close()
 
 
 def test_three_phase_split_preserves_styles(tmp_path):

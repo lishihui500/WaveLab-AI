@@ -67,6 +67,32 @@ def rpc(method, params=None, session_id=None, runtime_dir=None):
     found, targets = [], []
     discovery = perf_counter()
     descriptors = list(directory.glob("*.json"))
+    if session_id:
+        # An offline selected session is absent from list_sessions. Route using
+        # its explicit binding so cold and warm calls report the same state.
+        from wavelab.target_binding import TargetStore
+        binding = TargetStore(directory / "codex-target.json").read()
+        if binding and binding["target"]["session_id"] == session_id:
+            endpoint_id = binding["endpoint_id"]
+            if len(endpoint_id) != 32 or any(c not in "0123456789abcdef" for c in endpoint_id):
+                return finish(dict(error="target_unbound"))
+            try:
+                endpoint = json.loads((directory / (endpoint_id + ".json")).read_text(encoding="utf-8"))
+                port = endpoint["port"]
+                if type(port) is not int or not 0 < port < 65536:
+                    raise ValueError("invalid endpoint")
+                candidate = (f"http://127.0.0.1:{port}/rpc", {"Authorization": "Bearer " + endpoint["token"], "Content-Type": "application/json"})
+            except (OSError, ValueError, KeyError, TypeError):
+                return finish(dict(error="target_offline"))
+            try:
+                result = call(candidate, method, session_id)
+            except (OSError, ValueError):
+                return finish(dict(error="connection_lost" if method in {"apply_plot_actions", "save_project"} else "target_offline"))
+            with _route_lock:
+                _routes[key] = (monotonic(), candidate)
+                if len(_routes) > 256:
+                    _routes.clear()
+            return finish(result)
     if method == "get_edit_target":
         # One atomic GUI selection determines its exact endpoint. No all-session scan.
         try:
@@ -92,6 +118,8 @@ def rpc(method, params=None, session_id=None, runtime_dir=None):
                 incompatible = True
                 continue
             if method == "get_edit_target":
+                if "error" in listing:
+                    return finish(listing)
                 if "target" in listing:
                     targets.append((listing, candidate))
             else:
@@ -102,7 +130,8 @@ def rpc(method, params=None, session_id=None, runtime_dir=None):
     routing = perf_counter()
     if method == "get_edit_target":
         if len(targets) != 1:
-            return finish(dict(error="target_unbound" if not targets else "target_ambiguous"))
+            return finish(dict(error="target_offline" if not targets else "target_ambiguous",
+                               message="编辑目标离线，请恢复已选择的工作台页面连接"))
         result, route = targets[0]
         sid = result["target"]["session_id"]
         with _route_lock:

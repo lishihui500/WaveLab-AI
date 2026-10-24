@@ -47,9 +47,9 @@ def test_five_sessions_same_names_target_switch_epoch_expiry(work, tmp_path):
         assert b.request("get_edit_target", {})["error"] == "target_unbound"
         b.bind_target("gui", work)
         b.sessions["gui"].seen -= 20
-        assert b.request("get_edit_target", {})["error"] == "target_unbound"
+        assert b.request("get_edit_target", {})["error"] == "target_offline"
         b.attach("gui")
-        assert b.request("get_edit_target", {})["error"] == "target_unbound"
+        assert b.request("get_edit_target", {})["target"]["session_id"] == "gui"
     finally:
         b.close()
 

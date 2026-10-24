@@ -18,4 +18,4 @@ def action_schema():
 @lru_cache(maxsize=1)
 def identity():
     raw = json.dumps(action_schema(), sort_keys=True, separators=(",", ":")).encode()
-    return dict(protocol_version="1", schema_hash=hashlib.sha256(raw).hexdigest())
+    return dict(protocol_version="2", schema_hash=hashlib.sha256(raw).hexdigest())

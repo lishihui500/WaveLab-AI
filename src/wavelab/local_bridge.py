@@ -22,6 +22,7 @@ from wavelab.ai.assistant import figure_context
 from wavelab.mcp_protocol import identity
 from wavelab.mcp_metrics import current as metrics_current, measure
 from wavelab.coverage import coverage
+from wavelab.target_binding import TargetStore, project_identity
 from importlib.metadata import version
 
 APPLICATION_VERSION = version("wavelab-ai")
@@ -123,12 +124,16 @@ class Pending:
     result: dict | None = None
     queued_at: float = field(default_factory=monotonic)
     request_id: str = field(default_factory=lambda: uuid4().hex)
+    binding_id: str | None = None
 
 
 class Session:
     def __init__(self):
         self.queue = Queue(maxsize=32)
         self.seen = monotonic()
+        self.project_epoch = None
+        self.project_identity = None
+        self.binding_id = None
 
 
 class Bridge:
@@ -136,7 +141,6 @@ class Bridge:
         self.sessions = {}
         self.performance_records = deque(maxlen=256)
         self.lock = Lock()
-        self.target = None
         self.token = secrets.token_urlsafe(32)
         bridge = self
 
@@ -198,6 +202,7 @@ class Bridge:
         else:
             directory.chmod(0o700)
         self.target_file = directory / "codex-target.json"
+        self.target_store = TargetStore(self.target_file)
         self.descriptor = directory / (uuid4().hex + ".json")
         self.descriptor.write_text(json.dumps(dict(port=self.server.server_port, token=self.token)), encoding="utf-8")
         self.descriptor.chmod(0o600)
@@ -205,59 +210,124 @@ class Bridge:
         atexit.register(self.close)
 
     def close(self):
+        record = self.target_store.read()
+        if record and record["endpoint_id"] == self.descriptor.stem and not record["persistent"]:
+            self.target_store.replace(None, expected=record)
         self.server.shutdown()
         self.server.server_close()
         self.descriptor.unlink(missing_ok=True)
 
-    def attach(self, session_id):
+    def attach(self, session_id, w=None):
         with self.lock:
             session = self.sessions.setdefault(session_id, Session())
-            if monotonic() - session.seen >= 15 and self.target and self.target["session_id"] == session_id:
-                self.target = None
             session.seen = monotonic()
+            if w is not None:
+                session.project_epoch = w.project_epoch
+                session.project_identity = project_identity(w)
+        if w is not None:
+            self._sync_target(session_id, session)
         return session
 
-    def bind_target(self, session_id, w):
+    def _owner_running(self, record):
+        """Probe only the explicitly selected endpoint, never discover by name."""
+        from urllib.request import Request, ProxyHandler, build_opener
+        endpoint_id = record["endpoint_id"]
+        if len(endpoint_id) != 32 or any(c not in "0123456789abcdef" for c in endpoint_id):
+            return True  # Invalid identity is not permission to take ownership.
+        try:
+            endpoint = json.loads(self.descriptor.with_name(endpoint_id + ".json").read_text(encoding="utf-8"))
+            port = endpoint["port"]
+            if type(port) is not int or not 0 < port < 65536:
+                return True
+            request = Request(f"http://127.0.0.1:{port}/rpc",
+                json.dumps(dict(method="list_sessions", protocol=identity())).encode(),
+                {"Authorization": "Bearer " + endpoint["token"]})
+            with build_opener(ProxyHandler({})).open(request, timeout=1):
+                return True
+        except (OSError, ValueError, KeyError, TypeError):
+            return False
+
+    def _sync_target(self, session_id, session):
+        record = self.target_store.read()
+        if record is None:
+            return
+        owned = record["endpoint_id"] == self.descriptor.stem
+        selected = owned and record["target"]["session_id"] == session_id
+        if selected:
+            valid = (session.project_identity == record["project_identity"] if record["persistent"]
+                     else session.project_epoch == record["target"]["project_epoch"])
+            if not valid:
+                self.target_store.replace(None, expected=record)
+                return
+            if session.project_epoch == record["target"]["project_epoch"]:
+                session.binding_id = record["binding_id"]
+                return
+        elif not record["persistent"] or session.project_identity != record["project_identity"]:
+            return
+        elif owned:
+            with self.lock:
+                previous = self.sessions.get(record["target"]["session_id"])
+                if previous and monotonic() - previous.seen < 15:
+                    return  # An existing live selection always wins.
+                matches = [s for s in self.sessions.values() if monotonic() - s.seen < 15
+                           and s.project_identity == record["project_identity"]]
+                if len(matches) != 1:
+                    return
+        elif self._owner_running(record):
+            return  # Another running workbench retains its explicit selection.
+        restored = dict(record, endpoint_id=self.descriptor.stem,
+                        target=dict(session_id=session_id, project_epoch=session.project_epoch))
+        if self.target_store.replace(restored, expected=record):
+            session.binding_id = restored["binding_id"]
+
+    def bind_target(self, session_id, w, *, persistent=False):
         # GUI callback only. Persist an identity, never editable project contents.
         if w.spec is None:
             raise ValueError("请先打开工程")
-        with self.lock:
-            self.target = dict(session_id=session_id, project_epoch=w.project_epoch)
-            temporary = self.target_file.with_name(uuid4().hex + ".tmp")
-            try:
-                temporary.write_text(json.dumps(dict(target=self.target, endpoint_id=self.descriptor.stem)), encoding="utf-8")
-                os.replace(temporary, self.target_file)
-            finally:
-                temporary.unlink(missing_ok=True)
+        stable = project_identity(w)
+        if persistent and (stable is None or w.saved_spec is None
+                or sorted((m.dataset_id, m.source_sha256) for m in w.spec.datasets)
+                   != sorted((m.dataset_id, m.source_sha256) for m in w.saved_spec.datasets)):
+            raise ValueError("请先在 GUI 保存当前工程，再启用持久编辑目标")
+        self.attach(session_id, w)
+        record = dict(version=2, binding_id=uuid4().hex, persistent=persistent,
+            project_identity=stable if persistent else None, endpoint_id=self.descriptor.stem,
+            target=dict(session_id=session_id, project_epoch=w.project_epoch))
+        self.target_store.replace(record)
+        self.sessions[session_id].binding_id = record["binding_id"]
 
     def unbind_target(self, session_id):
-        with self.lock:
-            if self.target and self.target["session_id"] == session_id:
-                self.target = None
+        record = self.target_store.read()
+        if record and record["endpoint_id"] == self.descriptor.stem and record["target"]["session_id"] == session_id:
+            self.target_store.replace(None, expected=record)
 
     def request(self, method, params, session_id=None, timeout=30, request_id=None):
         with self.lock:
             active = {sid: s for sid, s in self.sessions.items() if monotonic() - s.seen < 15}
         if method == "get_edit_target":
-            with self.lock:
-                target = self.target.copy() if self.target else None
-                try:
-                    record = json.loads(self.target_file.read_text(encoding="utf-8"))
-                    if record.get("endpoint_id") != self.descriptor.stem or record.get("target") != target:
-                        target = None
-                except (OSError, ValueError):
-                    target = None
-            if not target or target["session_id"] not in active:
-                if target:
-                    self.unbind_target(target["session_id"])
+            record = self.target_store.read()
+            if not record or record["endpoint_id"] != self.descriptor.stem:
                 return dict(error="target_unbound")
-            return dict(target=target, protocol=identity())
+            result = dict(target=record["target"], persistent=record["persistent"],
+                          online=record["target"]["session_id"] in active, protocol=identity())
+            if not result["online"]:
+                result.update(error="target_offline", message="编辑目标离线；请恢复目标页面连接，目标选择已保留")
+            return result
         if method == "list_sessions":
             return dict(sessions=list(active))
         if session_id not in active:
+            record = self.target_store.read()
+            if record and record["endpoint_id"] == self.descriptor.stem and record["target"]["session_id"] == session_id:
+                return dict(error="target_offline", message="编辑目标离线，请恢复页面连接后重新读取状态")
             return dict(error="session_required" if active else "not_running", sessions=list(active))
         queued = monotonic()
         pending = Pending(method, params)
+        record = self.target_store.read()
+        selected = record and record["endpoint_id"] == self.descriptor.stem and record["target"]["session_id"] == session_id
+        if method in {"apply_plot_actions", "save_project"} and not selected and (record or active[session_id].binding_id):
+            return dict(error="target_changed", message="编辑目标已变化，请重新读取目标和工程状态")
+        if selected:
+            pending.binding_id = record["binding_id"]
         if isinstance(request_id, str) and len(request_id) == 32 and all(c in "0123456789abcdef" for c in request_id):
             pending.request_id = request_id
         try:
@@ -275,10 +345,7 @@ class Bridge:
         return pending.result
 
     def drain(self, session_id, w):
-        session = self.attach(session_id)
-        with self.lock:
-            if self.target and self.target["session_id"] == session_id and self.target["project_epoch"] != w.project_epoch:
-                self.target = None
+        session = self.attach(session_id, w)
         before = w.revision
         for _ in range(8):
             try:
@@ -288,6 +355,14 @@ class Bridge:
             with pending.lock:
                 if not pending.cancelled:
                     try:
+                        record = self.target_store.read()
+                        if pending.binding_id and (not record or record["binding_id"] != pending.binding_id
+                                or record["endpoint_id"] != self.descriptor.stem
+                                or record["target"] != dict(session_id=session_id, project_epoch=w.project_epoch)):
+                            pending.result = dict(error="target_changed", message="编辑目标已变化，请重新读取目标和工程状态")
+                            pending.result["diagnostics"] = dict(request_id=pending.request_id, stages_ms={}, success=False)
+                            pending.done.set()
+                            continue
                         timings = dict(request_enqueue_ms=getattr(pending, "enqueue_ms", 0), gui_queue_wait_ms=(monotonic() - pending.queued_at) * 1000)
                         token = metrics_current.set(timings)
                         try:

@@ -47,7 +47,7 @@ from wavelab.local_bridge import get_bridge
 if "mcp_session_id" not in st.session_state:
     st.session_state.mcp_session_id = uuid4().hex
 bridge = get_bridge(ROOT / ".wavelab" / "runtime")
-bridge.attach(st.session_state.mcp_session_id)
+bridge.attach(st.session_state.mcp_session_id, w)
 
 
 @st.fragment(run_every=0.5)
@@ -70,14 +70,28 @@ def codex_connection():
         st.warning("请先保存工程，再重启 WaveLab 和 Codex MCP 连接。")
         return
     sid = st.session_state.mcp_session_id
-    target = bridge.request("get_edit_target", {}).get("target", {})
+    selection = bridge.request("get_edit_target", {})
+    target = selection.get("target", {})
     st.session_state.codex_target_identity = target
     bound = target.get("session_id") == sid and target.get("project_epoch") == w.project_epoch
     name = w.project_path.parent.name if w.project_path else "未保存工程"
     st.caption(name + (" · 已设为 Codex 编辑目标" if bound else " · 当前会话未绑定"))
+    persistent = st.checkbox("保持为 Codex 编辑目标", value=bound and selection.get("persistent", False),
+                             disabled=w.project_path is None,
+                             key="codex_persistent_" + w.project_epoch,
+                             help="明确授权保存目标选择；同一工程重新连接或重启后自动恢复。")
+    if w.project_path is None:
+        st.caption("首次保存工程后可启用持久目标。")
+    elif bound and selection.get("persistent"):
+        st.caption("已启用持久目标：短暂离线和重新打开同一工程后自动恢复。")
     bind, unbind = st.columns([2, 1])
-    if bind.button("设为 Codex 编辑目标", disabled=w.spec is None or bound):
-        bridge.bind_target(sid, w)
+    if bind.button("设为 Codex 编辑目标", disabled=w.spec is None or (
+            bound and persistent == selection.get("persistent", False))):
+        try:
+            bridge.bind_target(sid, w, persistent=persistent)
+        except (OSError, ValueError) as exc:
+            st.error(str(exc))
+            return
         st.rerun()
     if bound and unbind.button("解除 Codex 编辑目标"):
         bridge.unbind_target(sid)
