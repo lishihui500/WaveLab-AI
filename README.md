@@ -20,7 +20,7 @@ WaveLab AI 是面向电气工程、电力电子及其他时序数据分析场景
 
 ### 下载
 
-点击 **[下载 ZIP](https://github.com/lishihui500/WaveLab-AI/archive/refs/heads/main.zip)** 并解压，或使用 Git：
+从 **[Releases 下载工作台](https://github.com/lishihui500/WaveLab-AI/releases/latest)** 并解压，或使用 Git 获取最新源码：
 
 ```bash
 git clone https://github.com/lishihui500/WaveLab-AI.git
@@ -60,6 +60,16 @@ python3 -m venv .venv
 5. 填写工程名称，点击“保存工程”，下次从“已保存工程”继续编辑。
 
 [跟着六桥臂示例完成三幅子图 →](examples/stage03c1_demo/README.md)
+
+### 一条命令生成示例图
+
+在项目根目录运行：
+
+```powershell
+.\.venv\Scripts\python.exe examples/render_example.py
+```
+
+脚本读取随附的 601 点合成六桥臂数据，生成三幅子图与局部放大图，保存示例工程并导出 PDF/PNG。终端会显示工程和图形的保存路径。
 
 ## 用自然语言修改图形
 

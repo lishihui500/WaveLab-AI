@@ -8,6 +8,7 @@ __pycache__/
 *.txt
 *.csv
 !examples/stage03c1_demo/synthetic_arms.csv
+!examples/synthetic_six_arms.csv
 *.npy
 *.npz
 !requirements.txt
