@@ -21,13 +21,13 @@
 
 ## 运行公开回归测试
 
-以下测试使用自身构造的输入，可在下载仓库后运行：
+默认测试使用随仓库提供的公开输入，覆盖解析、绘图配置、AI 方案、事务、局部图和编辑目标恢复。在项目根目录运行：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests/test_parser.py tests/test_figure_spec.py tests/test_ai.py tests/test_manual.py tests/test_manual_dialogue.py tests/test_local_bridge.py tests/test_mcp_workflow.py tests/test_mcp_insets.py -q
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-其余历史验收测试与部分 scripts 工具使用 `test/fixtures/`、`reports/` 中的本地资料。运行前查看各脚本输入与输出位置。完整案例资料由维护者单独管理。
+历史验收测试保存在 `tests_history/`，相关真实样本和实验记录由维护者单独管理。历史测试的运行方法见 [历史测试说明](../tests_history/README.md)。
 
 ## 技术资料
 
